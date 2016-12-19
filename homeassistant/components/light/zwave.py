@@ -5,13 +5,14 @@ For more details about this platform, please refer to the documentation at
 https://home-assistant.io/components/light.zwave/
 """
 import logging
+import random
 
 # Because we do not compile openzwave on CI
 # pylint: disable=import-error
 from threading import Timer
 from homeassistant.components.light import ATTR_BRIGHTNESS, ATTR_COLOR_TEMP, \
-    ATTR_RGB_COLOR, SUPPORT_BRIGHTNESS, SUPPORT_COLOR_TEMP, \
-    SUPPORT_RGB_COLOR, DOMAIN, Light
+    ATTR_EFFECT, ATTR_RGB_COLOR, EFFECT_RANDOM, SUPPORT_BRIGHTNESS, SUPPORT_COLOR_TEMP, \
+    SUPPORT_EFFECT, SUPPORT_RGB_COLOR, DOMAIN, Light
 from homeassistant.components import zwave
 from homeassistant.const import STATE_OFF, STATE_ON
 from homeassistant.util.color import HASS_COLOR_MAX, HASS_COLOR_MIN, \
@@ -42,7 +43,7 @@ TEMP_MID_HASS = (HASS_COLOR_MAX - HASS_COLOR_MIN) / 2 + HASS_COLOR_MIN
 TEMP_WARM_HASS = (HASS_COLOR_MAX - HASS_COLOR_MIN) / 3 * 2 + HASS_COLOR_MIN
 TEMP_COLD_HASS = (HASS_COLOR_MAX - HASS_COLOR_MIN) / 3 + HASS_COLOR_MIN
 
-SUPPORT_ZWAVE = SUPPORT_BRIGHTNESS | SUPPORT_COLOR_TEMP | SUPPORT_RGB_COLOR
+SUPPORT_ZWAVE = SUPPORT_BRIGHTNESS | SUPPORT_COLOR_TEMP | SUPPORT_RGB_COLOR | SUPPORT_EFFECT
 
 
 def setup_platform(hass, config, add_devices, discovery_info=None):
@@ -344,6 +345,20 @@ class ZwaveColorLight(ZwaveDimmer):
                 for colorval in self._rgb:
                     rgbw += format(colorval, '02x').encode('utf-8')
                 rgbw += b'0000'
+
+        elif ATTR_EFFECT in kwargs:
+            effect = kwargs.get(ATTR_EFFECT)
+            if effect == EFFECT_RANDOM:
+                self._rgb = (random.randrange(0, 255),
+                             random.randrange(0, 255),
+                             random.randrange(0, 255))
+                rgbw = b'#'
+                for colorval in color_rgb_to_rgbw(*self._rgb):
+                    rgbw += format(colorval, '02x').encode('utf-8')
+                rgbw += b'00'
+                _LOGGER.debug("turn_on requested random effect for light:"
+                              " %s with rgb value %s ",
+                              self.name, self._rgb)
 
         if rgbw and self._value_color:
             self._value_color.node.set_rgbw(self._value_color.value_id, rgbw)
